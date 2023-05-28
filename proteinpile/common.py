@@ -16,11 +16,11 @@ def get_specification_variables(filename):
         return vars
 
 
-def get_runner(client, cls, **kwargs):
+def get_runner(client, cls, local_conf={}, **kwargs):
     if client is not None:
         runner = client.remote_model(cls, **kwargs)
     else:
-        runner = cls(**kwargs)
+        runner = cls(**local_conf, **kwargs)
     return runner
 
 

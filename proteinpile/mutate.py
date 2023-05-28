@@ -39,7 +39,9 @@ def action_add_backbones(args, pile, spec):
     for i in range(args.num):
         new_row = {}
         new_row['method'] = 'rfdiffusion-proteinmpnn'
-        trial = study.ask(spec.get_distributions())
+        trial = None
+        while trial is None or not spec.are_params_feasible(trial.params):
+            trial = study.ask(spec.get_distributions())
         new_row['params_dict'] = trial.params
         print("Sampled params")
         print(new_row['params_dict'])

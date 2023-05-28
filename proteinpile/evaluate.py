@@ -19,9 +19,12 @@ from . import common
 
 def add_args(parser):
     parser.add_argument("--chunksize", type=int, default=1000)
-    parser.add_argument("--endpoints-file", default=["/tmp/PROTEOPT_ENDPOINTS.TXT"], nargs="+")
+    parser.add_argument("--endpoints-file", nargs="+")
     parser.add_argument("--client-extra-parallelism-factor", type=int, default=1)
     parser.add_argument("--items-per-request", type=int, default=1)
+    parser.add_argument("--alphafold-weights-dir", default="/data/static/alphafold-params/")
+    parser.add_argument("--omegafold-weights-dir", default="/data/static/omegafold_ckpt/")
+    parser.add_argument("--rfdiffusion-weights-dir", default="/data/static/rfdiffusion-params")
 
 
 def handle_evaluate(args, pile, spec):
@@ -242,7 +245,12 @@ def run_proteinmpnn_chunk(args, client, spec, pile, chunk_indices, sampling_temp
 
 
 def run_rfdiffusion_chunk(args, client, spec, pile, chunk_indices):
-    runner = common.get_runner(client, proteopt.rfdiffusion_motif.RFDiffusionMotif)
+    runner = common.get_runner(
+            client,
+            proteopt.rfdiffusion_motif.RFDiffusionMotif,
+            local_conf={
+                "models_dir": args.rfdiffusion_weights_dir,
+            })
 
     work = []
     work_indices = []
