@@ -3,12 +3,14 @@ import json
 import shutil
 import hashlib
 import time
+import logging
 
 import numpy
 import pandas
 from frozendict import frozendict
 
 from .common import load_pdb
+from .design import Design
 
 class Pile(object):
     COLUMNS = [
@@ -97,6 +99,33 @@ class Pile(object):
 
     def load_pdb(self, filename):
         return load_pdb(self.get_path(filename))
+
+    def get_designs(self, spec, names=None):
+        abbreviated_names = (
+                self.manifest.index.str.slice(0, 10) +
+                self.manifest.index.str.slice(-6)).str.replace(".", "", regex=False)
+
+        if abbreviated_names.value_counts().max() > 1:
+            logging.warning(
+                "Abbreviated names not unique, falling back to full names: %s" %
+                abbreviated_names.value_counts().head(10))
+            abbreviated_names = self.manifest.index
+
+        if names is None:
+            names = self.manifest.index
+        return [
+            self.get_design(spec, name, abbreviated_name=abbreviated)
+            for (name, abbreviated)
+            in zip(names, abbreviated_names)
+        ]
+
+    def get_design(self, spec, name, abbreviated_name=None):
+        row = self.manifest.loc[name]
+        return Design(
+            spec=spec,
+            intermediates_dir=self.intermediates_dir,
+            row=row,
+            abbreviated_name=abbreviated_name)
 
 
 def load_manifest_csv(filename):

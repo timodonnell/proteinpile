@@ -9,16 +9,16 @@ def add_pile_to_study(spec, pile, study):
     df = pile.manifest.loc[~pile.manifest.metrics_dict.isnull()]
     print("Loading data into optuna study")
     trial_num_to_name = {}
-    for (i, (name, row)) in tqdm.tqdm(enumerate(df.iterrows()), total=len(df)):
+    for (i, design) in enumerate(tqdm.tqdm(pile.get_designs(spec, df.index.values))):
         trial = optuna.trial.create_trial(
             params=dict(
-                (k, v) for (k, v) in row.params_dict.items() if not k.startswith("_")),
+                (k, v) for (k, v) in design.params_dict.items() if not k.startswith("_")),
             distributions=distributions,
-            values=spec.loss(row.metrics_dict)
+            values=spec.loss(design)
         )
         trial.number = i
         study.add_trial(trial)
-        trial_num_to_name[i] = name
+        trial_num_to_name[i] = design.name
     return trial_num_to_name
 
 PDB_CACHE = {}
@@ -62,5 +62,5 @@ def get_client(args):
 PROBLEM_CACHE = {}
 def get_problem(spec, params_dict):
     if params_dict not in PROBLEM_CACHE:
-        PROBLEM_CACHE[params_dict] = spec.get_problem(params_dict).get_first_chain()
+        PROBLEM_CACHE[params_dict] = spec.get_problem(params_dict)
     return PROBLEM_CACHE[params_dict]

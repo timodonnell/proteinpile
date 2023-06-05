@@ -5,8 +5,15 @@ import optuna
 
 from . import common
 
+
 def add_args(parser):
     parser.add_argument("--verify", action="store_true", default=False)
+    parser.add_argument("--out-pymol", metavar="SCRIPT.pml")
+    parser.add_argument(
+        "--selection-criteria",
+        choices=("pareto", "interactive", "expression"),
+        default="pareto")
+    parser.add_argument("--expression")
 
 
 def handle_info(args, pile, spec):
@@ -18,14 +25,28 @@ def handle_info(args, pile, spec):
 
     if 'metrics_dict' in pile.manifest:
         pile.summarize_metrics()
-        study = optuna.create_study(directions=spec.directions())
-        trial_num_to_name = common.add_pile_to_study(spec, pile, study)
-        names = []
-        for (i, trial) in enumerate(study.best_trials):
-            name = trial_num_to_name[trial.number]
-            names.append(name)
+        best_names = []
+        best_df = None
+        if args.selection_criteria == "pareto":
+            study = optuna.create_study(directions=spec.directions())
+            trial_num_to_name = common.add_pile_to_study(spec, pile, study)
+            for (i, trial) in enumerate(study.best_trials):
+                name = trial_num_to_name[trial.number]
+                best_names.append(name)
+        elif args.selection_criteria == "interactive":
+            print("Define 'best_names' to be a list of the IDs of your selected trials.")
+            print("You can also define best_df to be a dataframe of the selected designs.")
+            print("pile.manifest is:")
+            print(pile.manifest)
+            import ipdb
+            ipdb.set_trace()
+        elif args.selection_criteria == "expression":
+            best_names = pile.manifest.query(args.expression).index.tolist()
+        else:
+            raise ValueError(f"Unknown selection criteria {args.selection_criteria}")
 
-        best_df = pile.manifest.loc[names]
+        if best_df is None:
+            best_df = pile.manifest.loc[best_names]
         for (i, (name, row)) in enumerate(best_df.iterrows()):
             print("*" * 40)
             print(f"BEST TRIAL {i + 1}/{len(study.best_trials)}")
@@ -50,7 +71,14 @@ def handle_info(args, pile, spec):
                             annotation += " [highest]"
                         print("\t%40s : %0.5f" % (k, v) + annotation)
 
-
+        if args.out_pymol:
+            with open(args.out_pymol, "w") as fd:
+                designs = pile.get_designs(spec, best_df.index.tolist())
+                lines = spec.pymol_lines(designs)
+                for line in lines:
+                    fd.write(line)
+                    fd.write("\n")
+            print("Wrote pymol script to", args.out_pymol)
 
     if args.verify:
         df = pile.manifest

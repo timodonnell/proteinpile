@@ -1,6 +1,7 @@
 import os
 import hashlib
 import time
+import logging
 
 import numpy
 
@@ -25,24 +26,27 @@ def add_args(parser):
     parser.add_argument("--alphafold-weights-dir", default="/data/static/alphafold-params/")
     parser.add_argument("--omegafold-weights-dir", default="/data/static/omegafold_ckpt/")
     parser.add_argument("--rfdiffusion-weights-dir", default="/data/static/rfdiffusion-params")
-
+    parser.add_argument("--recompute-metrics", action="store_true")
 
 def handle_evaluate(args, pile, spec):
     client = common.get_client(args)
+
+    if args.recompute_metrics:
+        print("Will recompute all metrics")
+        pile.manifest["metrics_dict"] = None
 
     # Now run designs and process by chunks
     df = pile.manifest
     while df[pile.COLUMNS].isnull().any().any():
         pile.summarize_metrics()
-        missing_anything = df.loc[df[pile.COLUMNS].isnull().any(axis=1)]
-        print("Rows missing any computed col", len(missing_anything))
-        missing_counts = missing_anything[pile.COLUMNS].isnull().sum(1).value_counts()
+        print("Rows missing any col:", df[pile.COLUMNS].isnull().any(axis=1).sum())
+        missing_counts = df[pile.COLUMNS].isnull().sum(1).value_counts()
         print("Number of rows missing indicated number of columns:")
-        print(missing_counts)
-        min_missing = missing_counts.index.to_series().min()
+        print(missing_counts.sort_index())
+        min_missing = missing_counts[missing_counts.index > 0].index.to_series().min()
         print(f"Next chunk will process rows missing {min_missing} computed columns")
-        sub_df = missing_anything.loc[
-            missing_anything[pile.COLUMNS].isnull().sum(1) == min_missing
+        sub_df = df.loc[
+            df[pile.COLUMNS].isnull().sum(1) == min_missing
         ]
         chunk_indices = sample_chunk_grouped_by_params_or_design_backbone_filename(
             sub_df, args.chunksize)
@@ -109,17 +113,8 @@ def process_chunk_to_completion(
         print("Computing metrics")
         metrics_list = []
         for idx, row in tqdm.tqdm(needs_metrics.iterrows(), total=len(needs_metrics)):
-            problem = common.get_problem(spec, row.params_dict)
-            structures = {
-                'raw_design': pile.load_pdb(row.backbone_filename).select("chain A").copy(),
-            }
-            problem.annotate_solution(structures['raw_design'])
-            for predictor in spec.required_structure_predictors():
-                col = f"{predictor}_filename"
-                structures[predictor] = pile.load_pdb(row[col])
-                problem.annotate_solution(structures[predictor])
-            metrics = spec.get_metrics(
-                row.params_dict, problem, structure_predictions=structures)
+            design = pile.get_design(spec, name=idx)
+            metrics = spec.get_metrics(design)
             metrics_list.append(metrics)
         pile.manifest.loc[needs_metrics.index, "metrics_dict"] = metrics_list
         pile.save()
@@ -201,7 +196,7 @@ def run_proteinmpnn_chunk(args, client, spec, pile, chunk_indices, sampling_temp
 
         handle = pile.load_pdb(d).select("chain A").copy()
         params_dict, = pile.manifest.loc[big_sub_df.index, "params_dict"].unique()
-        problem = common.get_problem(spec, params_dict)
+        problem = common.get_problem(spec, params_dict).get_first_chain()
         problem.annotate_solution(handle)
         problems[params_dict] = problem
 
