@@ -1,5 +1,25 @@
+import optuna
+import tqdm
 import prody
 import proteopt.client
+
+
+def add_pile_to_study(spec, pile, study):
+    distributions = spec.get_distributions()
+    df = pile.manifest.loc[~pile.manifest.metrics_dict.isnull()]
+    print("Loading data into optuna study")
+    trial_num_to_name = {}
+    for (i, (name, row)) in tqdm.tqdm(enumerate(df.iterrows()), total=len(df)):
+        trial = optuna.trial.create_trial(
+            params=dict(
+                (k, v) for (k, v) in row.params_dict.items() if not k.startswith("_")),
+            distributions=distributions,
+            values=spec.loss(row.metrics_dict)
+        )
+        trial.number = i
+        study.add_trial(trial)
+        trial_num_to_name[i] = name
+    return trial_num_to_name
 
 PDB_CACHE = {}
 def load_pdb(filename):

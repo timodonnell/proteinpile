@@ -6,6 +6,8 @@ import optuna
 
 import tqdm
 
+from .common import add_pile_to_study
+
 def add_args(parser):
     parser.add_argument(
         "action", choices=("add-sequences", "add-backbones", "hand-edit"))
@@ -14,18 +16,6 @@ def add_args(parser):
     parser.add_argument("--designs", nargs="+")
     parser.add_argument("--optuna-optimize", default=False, action="store_true")
 
-
-def add_pile_to_study(spec, pile, study):
-    distributions = spec.get_distributions()
-    df = pile.manifest.loc[~pile.manifest.metrics_dict.isnull()]
-    print("Loading data into optuna study")
-    for _, row in tqdm.tqdm(df.iterrows(), total=len(df)):
-        trial = optuna.trial.create_trial(
-            params=row.params_dict,
-            distributions=distributions,
-            values=spec.loss(row.metrics_dict)
-        )
-        study.add_trial(trial)
 
 def action_add_backbones(args, pile, spec):
     df = pile.manifest
@@ -43,6 +33,7 @@ def action_add_backbones(args, pile, spec):
         while trial is None or not spec.are_params_feasible(trial.params):
             trial = study.ask(spec.get_distributions())
         new_row['params_dict'] = trial.params
+        new_row['params_dict']['_time'] = time.time()
         print("Sampled params")
         print(new_row['params_dict'])
         new_row["provenance_dict"] = {
