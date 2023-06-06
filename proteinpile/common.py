@@ -1,8 +1,11 @@
+import argparse
+import shlex
 import optuna
 import tqdm
 import prody
 import proteopt.client
 
+from . import specification_defaults
 
 def add_pile_to_study(spec, pile, study):
     distributions = spec.get_distributions()
@@ -34,6 +37,29 @@ def get_specification_variables(filename):
         code = compile(f.read(), filename, 'exec')
         exec(code, vars, vars)
         return vars
+
+
+def get_spec(filename, args=""):
+    spec_vars = get_specification_variables(filename)
+    spec_parser = argparse.ArgumentParser()
+    spec_vars['Specification'].add_args(spec_parser)
+    spec_args = spec_parser.parse_args(shlex.split(args))
+    spec = spec_vars['Specification'](spec_args)
+
+    if spec.required_structure_predictors is None:
+        print("Using default required_structure_predictors() implementation")
+        spec.required_structure_predictors = \
+            specification_defaults.required_structure_predictors
+    if spec.get_metrics is None:
+        print("Using default get_metrics() implementation")
+        spec.get_metrics = specification_defaults.get_metrics
+    if spec.loss is None:
+        print("Using default loss() implementation")
+        spec.loss = specification_defaults.loss
+    if spec.directions is None:
+        print("Using default directions() implementation")
+        spec.directions = specification_defaults.directions
+    return spec
 
 
 def get_runner(client, cls, local_conf={}, **kwargs):

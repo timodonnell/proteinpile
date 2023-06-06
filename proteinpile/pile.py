@@ -102,21 +102,20 @@ class Pile(object):
 
     def get_designs(self, spec, names=None):
         abbreviated_names = (
-                self.manifest.index.str.slice(0, 10) +
-                self.manifest.index.str.slice(-6)).str.replace(".", "", regex=False)
+                self.manifest.index.to_series().str.slice(0, 10) +
+                self.manifest.index.to_series().str.slice(-6)).str.replace(".", "", regex=False)
 
         if abbreviated_names.value_counts().max() > 1:
             logging.warning(
                 "Abbreviated names not unique, falling back to full names: %s" %
                 abbreviated_names.value_counts().head(10))
-            abbreviated_names = self.manifest.index
+            abbreviated_names = self.manifest.index.to_series()
 
         if names is None:
             names = self.manifest.index
         return [
-            self.get_design(spec, name, abbreviated_name=abbreviated)
-            for (name, abbreviated)
-            in zip(names, abbreviated_names)
+            self.get_design(spec, name, abbreviated_name=abbreviated_names[name])
+            for name in names
         ]
 
     def get_design(self, spec, name, abbreviated_name=None):

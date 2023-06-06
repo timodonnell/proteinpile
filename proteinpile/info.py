@@ -2,6 +2,7 @@ import numpy
 import tqdm
 import json
 import optuna
+import pandas
 
 from . import common
 
@@ -38,6 +39,14 @@ def handle_info(args, pile, spec):
             print("You can also define best_df to be a dataframe of the selected designs.")
             print("pile.manifest is:")
             print(pile.manifest)
+            df = pile.manifest.copy()
+            df = pandas.concat(
+                [df] + [
+                    pandas.DataFrame.from_records(df[col].values, index=df.index)
+                    for col in df.columns
+                    if col.endswith("_dict")
+                ],
+                axis=1)
             import ipdb
             ipdb.set_trace()
         elif args.selection_criteria == "expression":
@@ -45,8 +54,9 @@ def handle_info(args, pile, spec):
         else:
             raise ValueError(f"Unknown selection criteria {args.selection_criteria}")
 
-        if best_df is None:
-            best_df = pile.manifest.loc[best_names]
+        if best_df is not None:
+            best_names = best_df.index.values
+        best_df = pile.manifest.loc[best_names]
         for (i, (name, row)) in enumerate(best_df.iterrows()):
             print("*" * 40)
             print(f"BEST TRIAL {i + 1}/{len(study.best_trials)}")

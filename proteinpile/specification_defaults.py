@@ -16,7 +16,7 @@ def get_metrics(design):
             design.get_structure(predictor).ca, raw.ca, ).rmsd
     result["ca_rmsd_af2_vs_omegafold"] = proteopt.alignment.smart_align(
         design.get_structure("omegafold").ca,
-        design.get_structure("af2").ca, ).rmsd
+        design.get_structure("af2").ca).rmsd
     return result
 
 

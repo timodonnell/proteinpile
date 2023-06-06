@@ -50,25 +50,7 @@ def run(argv=sys.argv[1:]):
         return
 
     pile = Pile(args.manifest, args.intermediates_dir)
-    spec_vars = common.get_specification_variables(args.specification)
-
-    spec_parser = argparse.ArgumentParser()
-    spec_vars['Specification'].add_args(spec_parser)
-    spec_args = spec_parser.parse_args(shlex.split(args.specification_args))
-    spec = spec_vars['Specification'](spec_args)
-
-    if spec.required_structure_predictors is None:
-        print("Using default required_structure_predictors() implementation")
-        spec.required_structure_predictors = specification_defaults.required_structure_predictors
-    if spec.get_metrics is None:
-        print("Using default get_metrics() implementation")
-        spec.get_metrics = specification_defaults.get_metrics
-    if spec.loss is None:
-        print("Using default loss() implementation")
-        spec.loss = specification_defaults.loss
-    if spec.directions is None:
-        print("Using default directions() implementation")
-        spec.directions = specification_defaults.directions
+    spec = common.get_spec(args.specification, args.specification_args)
 
     if args.subcommand == "evaluate":
         evaluate.handle_evaluate(args, pile, spec)
