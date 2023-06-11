@@ -215,9 +215,13 @@ def run_proteinmpnn_chunk(args, client, spec, pile, chunk_indices, sampling_temp
     for (indices, generated) in zip(
             proteinmpnn_work_design_indices, tqdm.tqdm(proteinmpnn_results)):
         seqs = generated.sort_values("score", ascending=False).seq_A
-        seqs = seqs[
-            ~seqs.isin(pile.manifest.seq.dropna())
-        ].drop_duplicates().head(len(indices)).values
+        if sampling_temp < 1.0:
+            # To avoid infinite loops for weird cases, we accept duplicates
+            # once the sampling temp reaches 1.0
+            seqs = seqs[
+                ~seqs.isin(pile.manifest.seq.dropna())
+            ].drop_duplicates()
+        seqs = seqs.head(len(indices)).values
         params_dict, = pile.manifest.loc[indices, "params_dict"].unique()
         problem = problems[params_dict]
         for seq in seqs:
@@ -230,7 +234,7 @@ def run_proteinmpnn_chunk(args, client, spec, pile, chunk_indices, sampling_temp
 
     if indices_to_rerun:
         indices_to_rerun = sorted(indices_to_rerun)
-        new_sampling_temp = sampling_temp * 1.1
+        new_sampling_temp = min(sampling_temp * 1.1, 1.0)
         print(
             f"Rerunning proteinmpnn on {len(indices_to_rerun)}/{len(chunk_indices)} "
             f"at sampling temp {new_sampling_temp} (was {sampling_temp}) to find "
