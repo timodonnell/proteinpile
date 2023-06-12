@@ -20,6 +20,8 @@ class Pile(object):
         "seq",
         "af2_filename",
         "af2_dict",
+        "af2_templated_filename",
+        "af2_templated_dict",
         "omegafold_filename",
         "omegafold_dict",
         "metrics_dict",

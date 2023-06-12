@@ -88,16 +88,26 @@ def process_chunk_to_completion(
         pile.save()
 
     # Structure predictors
-    for predictor in ["af2", "omegafold"]:
-        needs_prediction = chunk_df.loc[chunk_df[predictor + "_filename"].isnull()]
-        if len(needs_prediction) > 0:
-            print("Running", predictor)
-            run_structure_predictor(
-                predictor,
-                args,
-                client,
-                pile,
-                needs_prediction.index)
+    needed_predictors = spec.required_structure_predictors()
+    for predictor in ["af2", "af2_templated", "omegafold"]:
+        needs_prediction = chunk_df.loc[
+            chunk_df[predictor + "_filename"
+        ].isnull()]
+        if predictor in needed_predictors:
+            if len(needs_prediction) > 0:
+                print("Running", predictor)
+                run_structure_predictor(
+                    predictor,
+                    args,
+                    client,
+                    pile,
+                    needs_prediction.index)
+                pile.save()
+        else:
+            pile.manifest.loc[needs_prediction.index, predictor + "_filename"] = "NA"
+            pile.manifest.loc[needs_prediction.index, predictor + "_info"] = [
+                {}
+            ] * len(needs_prediction)
             pile.save()
 
         chunk_df = pile.manifest.loc[chunk_indices]
@@ -130,18 +140,41 @@ def run_structure_predictor(predictor_name, args, client, pile, chunk_indices):
             model_name="model_4_ptm",
             num_recycle=0,
             amber_relax=False)
+        results = runner.run_multiple(
+            pile.manifest.loc[chunk_indices].seq.values,
+            show_progress=True,
+            items_per_request=args.items_per_request)
+    elif predictor_name == "af2_templated":
+        runner = common.get_runner(
+            client,
+            proteopt.alphafold.AlphaFold,
+            max_length=int(pile.manifest.loc[chunk_indices].seq.str.len().max()),
+            model_name="model_4_ptm",
+            num_recycle=0,
+            amber_relax=False)
+        results = runner.run_multiple(
+            [
+                {
+                    "seq": row.seq,
+                    "template": pile.load_pdb(row.backbone_filename),
+                    "template_replace_sequence_with_gaps": False,
+                    "template_mask_sidechains": False,
+                }
+                for name, row in pile.manifest.loc[chunk_indices].iterrows()
+            ],
+            show_progress=True,
+            items_per_request=args.items_per_request)
     elif predictor_name == "omegafold":
         runner = common.get_runner(
             client,
             proteopt.omegafold.OmegaFold,
         )
+        results = runner.run_multiple(
+            pile.manifest.loc[chunk_indices].seq.values,
+            show_progress=True,
+            items_per_request=args.items_per_request)
     else:
         raise NotImplementedError(predictor_name)
-
-    results = runner.run_multiple(
-        pile.manifest.loc[chunk_indices].seq.values,
-        show_progress=True,
-        items_per_request=args.items_per_request)
 
     for ((name, row), prediction) in zip(pile.manifest.loc[chunk_indices].iterrows(), results):
         filename = f"{name}.{predictor_name}.pdb"
@@ -150,7 +183,7 @@ def run_structure_predictor(predictor_name, args, client, pile, chunk_indices):
         print("Wrote", filepath)
         pile.manifest.loc[name, f"{predictor_name}_filename"] = filename
         info = {}
-        if predictor_name == "af2":
+        if predictor_name in ["af2", "af2_templated"]:
             info = {
                 "ptm": prediction.getData("af2_ptm").mean(),
                 "mean_plddt": prediction.getData("af2_plddt").mean(),
