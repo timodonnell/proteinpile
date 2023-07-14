@@ -22,11 +22,13 @@ class Design(object):
         self.backbone_filename = row["backbone_filename"]
         self.seq = row["seq"]
         self.af2_filename = row["af2_filename"]
+        self.af2_templated_filename = row["af2_templated_filename"]
         self.omegafold_filename = row["omegafold_filename"]
         self.serial_number = row["serial_number"]
         self.params_dict = row["params_dict"]
         self.metrics_dict = row["metrics_dict"]
         self.af2_dict = row["af2_dict"]
+        self.af2_templated_dict = row["af2_dict"]
         self.omegafold_dict = row["omegafold_dict"]
         self.provenance_dict = row["provenance_dict"]
 
@@ -38,10 +40,20 @@ class Design(object):
 
     def get_structure_path(self, predictor):
         if predictor == "backbone":
+            if self.backbone_filename == "NA":
+                raise ValueError("Structure prediction %s was not computed" % predictor)
             return os.path.join(self.intermediates_dir, self.backbone_filename)
         elif predictor == "af2":
+            if self.af2_filename == "NA":
+                raise ValueError("Structure prediction %s was not computed" % predictor)
             return os.path.join(self.intermediates_dir, self.af2_filename)
+        elif predictor == "af2_templated":
+            if self.af2_templated_filename == "NA":
+                raise ValueError("Structure prediction %s was not computed" % predictor)
+            return os.path.join(self.intermediates_dir, self.af2_templated_filename)
         elif predictor == "omegafold":
+            if self.omegafold_filename == "NA":
+                raise ValueError("Structure prediction %s was not computed" % predictor)
             return os.path.join(self.intermediates_dir, self.omegafold_filename)
         else:
             raise ValueError("Unknown structure predictor: %s" % predictor)

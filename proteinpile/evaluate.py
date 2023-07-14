@@ -51,6 +51,8 @@ def handle_evaluate(args, pile, spec):
         chunk_indices = sample_chunk_grouped_by_params_or_design_backbone_filename(
             sub_df, args.chunksize)
         print("Sampled chunk of length", len(chunk_indices))
+        print("Missing columns (count): ")
+        print(df.loc[chunk_indices, pile.COLUMNS].isnull().sum(0))
         process_chunk_to_completion(
             args,
             client,
@@ -91,8 +93,8 @@ def process_chunk_to_completion(
     needed_predictors = spec.required_structure_predictors()
     for predictor in ["af2", "af2_templated", "omegafold"]:
         needs_prediction = chunk_df.loc[
-            chunk_df[predictor + "_filename"
-        ].isnull()]
+            chunk_df[predictor + "_filename"].isnull()
+        ]
         if predictor in needed_predictors:
             if len(needs_prediction) > 0:
                 print("Running", predictor)
@@ -104,8 +106,8 @@ def process_chunk_to_completion(
                     needs_prediction.index)
                 pile.save()
         else:
-            pile.manifest.loc[needs_prediction.index, predictor + "_filename"] = "NA"
-            pile.manifest.loc[needs_prediction.index, predictor + "_info"] = [
+            pile.manifest.loc[needs_prediction.index, predictor + "_filename"] = "-"
+            pile.manifest.loc[needs_prediction.index, predictor + "_dict"] = [
                 {}
             ] * len(needs_prediction)
             pile.save()
@@ -149,14 +151,14 @@ def run_structure_predictor(predictor_name, args, client, pile, chunk_indices):
             client,
             proteopt.alphafold.AlphaFold,
             max_length=int(pile.manifest.loc[chunk_indices].seq.str.len().max()),
-            model_name="model_4_ptm",
+            model_name="model_2_ptm",
             num_recycle=0,
             amber_relax=False)
         results = runner.run_multiple(
             [
                 {
-                    "seq": row.seq,
-                    "template": pile.load_pdb(row.backbone_filename),
+                    "sequence": row.seq,
+                    "template": pile.load_pdb(row.backbone_filename).select("chain A"),
                     "template_replace_sequence_with_gaps": False,
                     "template_mask_sidechains": False,
                 }
@@ -236,7 +238,7 @@ def run_proteinmpnn_chunk(args, client, spec, pile, chunk_indices, sampling_temp
         for sub_df in sub_dfs:
             proteinmpnn_work.append({
                 "structure": handle,
-                "fixed": handle.select("constrained_by_sequence"),
+                "fixed": spec.fixed_sequence_selection(handle),
                 "num": len(sub_df) + 1,  # one extra to allow for duplicates
             })
             proteinmpnn_work_design_indices.append(sub_df.index.values)

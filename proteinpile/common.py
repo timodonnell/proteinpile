@@ -5,7 +5,8 @@ import tqdm
 import prody
 import proteopt.client
 
-from . import specification_defaults
+from . import specification
+
 
 def add_pile_to_study(spec, pile, study):
     distributions = spec.get_distributions()
@@ -46,19 +47,11 @@ def get_spec(filename, args=""):
     spec_args = spec_parser.parse_args(shlex.split(args))
     spec = spec_vars['Specification'](spec_args)
 
-    if spec.required_structure_predictors is None:
-        print("Using default required_structure_predictors() implementation")
-        spec.required_structure_predictors = \
-            specification_defaults.required_structure_predictors
-    if spec.get_metrics is None:
-        print("Using default get_metrics() implementation")
-        spec.get_metrics = specification_defaults.get_metrics
-    if spec.loss is None:
-        print("Using default loss() implementation")
-        spec.loss = specification_defaults.loss
-    if spec.directions is None:
-        print("Using default directions() implementation")
-        spec.directions = specification_defaults.directions
+    assert hasattr(spec, "required_structure_predictors")
+    assert hasattr(spec, "get_metrics")
+    assert hasattr(spec, "loss")
+    assert hasattr(spec, "directions")
+    assert hasattr(spec, "fixed_sequence_selection")
     return spec
 
 

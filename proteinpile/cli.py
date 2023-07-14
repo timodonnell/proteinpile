@@ -10,7 +10,7 @@ import proteopt
 
 
 from .pile import Pile
-from . import common, evaluate, mutate, info, specification_defaults
+from . import common, evaluate, mutate, info, specification
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--manifest", default="manifest.csv")
